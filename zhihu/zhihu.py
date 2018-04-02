@@ -43,7 +43,7 @@ class ZhihuLogin():
             print('请输入验证码')
             pass
         else:
-            print('jixu')
+            print('')
     def login(self):
         self.get_captcha()
         #构造postdata
@@ -62,11 +62,9 @@ class ZhihuLogin():
         }
         loginUrl = 'https://www.zhihu.com/api/v3/oauth/sign_in'
         res = self.session.post(loginUrl, data=post_data, headers=self.headers)
-        print(res.text)
         auth = re.findall('"z_c0":"(.+)"},"refresh_token"',res.text)[0]
         self.headers.update({'authorization':auth})
         ifLogin = self.session.get('https://www.zhihu.com/api/v4/me?include=visits_count',headers=self.headers).json()
-        print(ifLogin)
         if ifLogin.get('name'):
             print('登录成功 用户名为：%s' % ifLogin.get('name'))
     def send(self,message):

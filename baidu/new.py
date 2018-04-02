@@ -6,7 +6,6 @@ import binascii
 import base64
 import time
 import math
-from getPwd import get_pwd
 import base64
 import urllib.parse
 from PIL import Image
@@ -18,6 +17,7 @@ import base64
 import random
 class baiduLogin():
 	def __init__(self, username, password):
+		#初始化参数
 		self.username = username
 		self.password = password
 		self.headers = headers = {
@@ -73,7 +73,6 @@ class baiduLogin():
 
 	def get_rsakey(self):
 		# 获取 pubkey， rsakey
-		traceid = self.createHeadID()
 		pubkey_url = 'https://passport.baidu.com/v2/getpublickey?token={}&tpl=mn&apiver=v3&tt={}&gid={}&loginversion=v4&traceid=&callback={}'.format(
 			self.token, int(time.time() * 1000), self.gid, self.callback)
 		pubkey_res = self.session.get(pubkey_url)
@@ -102,6 +101,7 @@ class baiduLogin():
 		dv = 'tk0.40904722587657581522648037169@ppo0k-9DpYrm~nCnj5n32uMeUCnehOrDhOM-Iz8Mt9FBeXAkpjuDpYrR6~Ok0yrGyyA2EhD3HGCneOMehDn2V~r2UOHMuXp3jP7BnY9kqxrGyf9k2V9D6Yrm~nCnj5n32uMeUCnehOrDhOM-Iz8Mt9FBeXAk6zrDnYrR6~Ok3xAkqYI029EethDIUOn2uCMz0yMeUepdIfDZ2L8GyxuDFjAk4xrMyxAkqYI029EethDIUOn2uCMz0yMeUepdIfDZ2L8GyjrDpzAk4xrMy_nofuD4eAkpxufydrD4yA5hPp-rLpvPg8BjbKmeY7dHb71yf9k2V-ss8CsuXspyJhuohrGyfAkFeForHvYyARCy9Dqwuz4fuD6-uRn-uD6~uD4fuRCxrkr-rDFjhorJ5Ewp5raAfU-H-pQFZ2b85nQFdULAf~e7ZEX8ZXQ8BC_~o0psuRnYrz6YrD4yrmy~rD3-Ak4euRqYrDCwrmyfuDFyAk0frDFYrDr~uC__yo0dsrmy~ufyfu1yfufywrGyeu1ye9GyduGy-9myxufyjrmyjuGy~rkCYrDqeAk0fumy~rRnYrD4dAk0-ufyfrDrYrRreAk4xrC__'
 		vcodetypeUrl = 'https://passport.baidu.com/v2/api/?logincheck&token={}&tpl=mn&apiver=v3&tt={}&sub_source=leadsetpwd&username={}&loginversion=v4&dv={}+&callback={}'
 		vcodetypeUrl = vcodetypeUrl.format(self.token,str(int(time.time())),self.username,dv, self.callback)
+		print(vcodetypeUrl)
 		vcodetypeRes = self.session.get(vcodetypeUrl).text
 		vcodetype  = re.findall('"vcodetype" : "(.+)",        "userid"',vcodetypeRes)[0]
 		code_string  = re.findall('"codeString" : "(.+)",\s+"vco',vcodetypeRes)[0]
@@ -163,9 +163,10 @@ class baiduLogin():
 		result= re.findall('err_no=(\d+)',post_res.text)[0]
 
 		if result == '0':
-			print('登录成功')
-			home_page = self.session.get('https://www.baidu.com/', headers=self.headers).text
-			print(home_page)
+
+			home_page = self.session.get('http://i.baidu.com/', headers=self.headers).text
+			user = re.findall('class="ibx-uc-nick">(.+)</a>',home_page)[0]
+			print('登录成功 %s ' % user)
 		elif result == '6':
 			print('验证码错误')
 			self.get_login_info()
@@ -173,5 +174,7 @@ class baiduLogin():
 			print('密码错误')
 			self.get_login_info()
 if __name__ == '__main__':
-    logind = baiduLogin('18500284177','aq918927')
+    username = input('输入用户名：')
+    password = input('输入密码：')
+    logind = baiduLogin(username,password)
     logind.get_login_info()

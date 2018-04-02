@@ -10,19 +10,24 @@ loginUrl = 'https://accounts.douban.com/login'
 def get_captcha(loginUrl):
     # 获取验证码图片
     res = s.get(loginUrl, headers=headers)
-    imgurl = re.findall('captcha_image" src="(https://.+=s)" alt="captcha"', res.text)[0]
-    with open('captcha.png', 'wb') as f:
-        f.write(s.get(imgurl).content)
-    captcha_id = re.findall('captcha\?id=(.+:en)', imgurl, re.S)[0]
-    # 返回图片id
-    return captcha_id
+    try:
+        imgurl = re.findall('src="(https://.+=s)" alt="captcha"', res.text)[0]
+        with open('captcha.png', 'wb') as f:
+            f.write(s.get(imgurl).content)
+        captcha_id = re.findall('captcha\?id=(.+:en)', imgurl, re.S)[0]
+        # 返回图片id
+        captcha_id = get_captcha(loginUrl)
+        im = Image.open('captcha.png')
+        im.show()
+        captcha = input('请输入验证码：')
+        im.close()
+        return captcha,captcha_id
+    except IndexError:
+        print('none')
+        return  '',''
 def login(loginUrl):
     # 获取id
-    captcha_id = get_captcha(loginUrl)
-    im = Image.open('captcha.png')
-    im.show()
-    captcha = input('请输入验证码：')
-    im.close()
+    captcha, captcha_id = get_captcha(loginUrl)
     post_data = {
         'source': 'None',
         'redir': 'https://www.douban.com',
@@ -33,6 +38,7 @@ def login(loginUrl):
         'login': '登录'
     }
     res = s.post(loginUrl, data=post_data, headers=headers).text
+    print(res)
     if '验证码不正确' in res:
         print('login failed retry!')
         login(loginUrl)
