@@ -71,7 +71,6 @@ class yidongLogin():
 		}
 
 		loginRes = self.session.get(loginUrl, params=loginData, headers=self.headers)
-		print('denglu jieguo %s ' % loginRes)
 		try:
 			artifact = loginRes.json()['artifact']
 		except Exception as e:
@@ -92,5 +91,7 @@ class yidongLogin():
 
 
 if __name__ == '__main__':
-    login = yidongLogin('15101528779','960128')
+    username = input('输入用户名：')
+    password = input('输入密码：')
+    login = yidongLogin(username,password)
     login.get_login_info()
