@@ -6,7 +6,7 @@ from Crypto.Cipher import PKCS1_v1_5
 import base64
 from PIL import  Image
 from pyquery import PyQuery as pq
-
+import random
 class JdLogin():
     def __init__(self,username,password):
         self.username = username
@@ -20,8 +20,8 @@ class JdLogin():
     def get_captcha(self,uuid):
         '''
         先用username验证是否需要验证码
-        :param uuid:
-        :return:
+        :param uuid:验证码对应的值
+        :return:返回是别的验证码
         '''
         verfiy_url = 'https://passport.jd.com/uc/showAuthCode?r=0.20551138503113386&version=2015'
         verfiy_res= self.session.post(verfiy_url,data={
@@ -102,9 +102,21 @@ class JdLogin():
             user= re.findall('<a href="//me.jd.com" target="_blank">(.+)</a>',home_res.text)[0]
             print('登录成功 用户名：%s' % user)
             #输出用户名即为成功
-
+    def buy_id(self,pid):
+        post_url = 'https://cart.jd.com/tproduct?pid={}&rid={}'.format(pid,str(random.random()))
+        post_res = self.session.post(post_url,data={},headers=self.headers)
+        print(post_res.text)
+        get_url = 'https://cart.jd.com/addToCart.html?rcd=1&pid={}&pc=1&eb=1&rid={}&em='.format(pid,str(int(time.time()*1000)))
+        get_res = self.session.get(get_url,headers=self.headers)
+        print(get_res.text)
+        url = 'https://skunotify.jd.com/breakice/query.action?callback=jQuery1346080&skuId={}&touchChannel=11&totalNum=4&exclusiveMaxNum=3&from=1&appName=cart&_='.format(pid,str(int(time.time()*1000)))
+        res = self.session.get(url,headers=self.headers)
+        print(res.text)
+        print(self.session.get('https://trade.jd.com/shopping/order/getOrderInfo.action?rid='.format(str(int(time.time()*1000))),headers=self.headers).text)
 if __name__ == '__main__':
-    username = input('输入用户名：')
-    password = input('输入密码：')
-    login = JdLogin(username,password)
+    # username = input('输入用户名：')
+    # password = input('输入密码：')
+    # login = JdLogin(username,password)
+    login = JdLogin('15100209057','918927an')
     login.login()
+    login.buy_id('6558982')
