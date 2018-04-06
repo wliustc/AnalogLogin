@@ -51,7 +51,7 @@ class JdLogin():
             encrypt.setPublicKey(pubKey);
             return encrypt.encrypt(pwd);
         }
-            :return nloginpwd:
+            :return nloginpwd:str 加密后的密码
             要用 encrypt 先  set  后get 传入
         '''
         pubkey= '''-----BEGIN PUBLIC KEY-----
