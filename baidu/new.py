@@ -185,7 +185,7 @@ class baiduLogin():
 			'loginmerge': 'true',
 			'splogin': 'rate',
 			'username': self.username,
-			'password': self.get_pwd(self.password),
+			'password': self.get_pwd(),
 			'verifycode': captchaCode,
 			'mem_pass': 'on',
 			'rsakey': rsakey,
@@ -203,7 +203,7 @@ class baiduLogin():
 		post_res = self.session.post(post_url, data=post_data, headers=self.headers)
 		#当返回值有err_no=0时登录成功
 		result= re.findall('err_no=(\d+)',post_res.text)[0]
-
+		print(result)
 		if result == '0':
 
 			home_page = self.session.get('http://i.baidu.com/', headers=self.headers).text

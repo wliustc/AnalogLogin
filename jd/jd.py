@@ -51,7 +51,6 @@ class JdLogin():
             encrypt.setPublicKey(pubKey);
             return encrypt.encrypt(pwd);
         }
-            :param pubkey:
             :return nloginpwd:
             要用 encrypt 先  set  后get 传入
         '''
@@ -67,6 +66,11 @@ class JdLogin():
         return text.decode()
 
     def login(self):
+        '''
+        使用self.get_pwd()获取加密后的密码
+        利用验证码, pubkey, token伪造post请求获取登录结果
+        :return: 是否登录成功
+        '''
         login_url = 'https://passport.jd.com/new/login.aspx'
         login_res = self.session.get(login_url,headers=self.headers)
         uuid = re.findall(' name="uuid" value="(.+)"/>',login_res.text)[0]
@@ -103,6 +107,11 @@ class JdLogin():
             print('登录成功 用户名：%s' % user)
             #输出用户名即为成功
     def buy_id(self,pid):
+        '''
+        通过商品的id伪造提交购买订单
+        :param pid:
+        :return:
+        '''
         post_url = 'https://cart.jd.com/tproduct?pid={}&rid={}'.format(pid,str(random.random()))
         post_res = self.session.post(post_url,data={},headers=self.headers)
         print(post_res.text)
@@ -114,9 +123,8 @@ class JdLogin():
         print(res.text)
         print(self.session.get('https://trade.jd.com/shopping/order/getOrderInfo.action?rid='.format(str(int(time.time()*1000))),headers=self.headers).text)
 if __name__ == '__main__':
-    # username = input('输入用户名：')
-    # password = input('输入密码：')
-    # login = JdLogin(username,password)
-    login = JdLogin('15100209057','918927an')
+    username = input('输入用户名：')
+    password = input('输入密码：')
+    login = JdLogin(username,password)
     login.login()
-    login.buy_id('6558982')
+    # login.buy_id('6558982')
