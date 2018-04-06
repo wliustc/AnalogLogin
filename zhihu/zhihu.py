@@ -1,88 +1,141 @@
+__author__ = 'wangmingming'
+from http import cookiejar
 import requests
-import hashlib
 import time
-import hmac
+import rsa
 import re
+import binascii
+import json
+import urllib
+import base64
+class Launcher():
+    def __init__(self):
+        '''
+        初始化用户名和姓名  session
+        :param username: 账号
+        :param password:密码
+        '''
 
-class ZhihuLogin():
-    def __init__(self,username,password):
-        #初始化用户名 密码 session  headers
-        self.session = requests.session()
-        self.username = username
-        self.password = password
+        self.session =  requests.session()
         self.headers = {
-            'Connection': 'keep-alive',
-            'Host': 'www.zhihu.com',
-            'Referer': 'https://www.zhihu.com/',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'
+            'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'
         }
+        self.session.cookies = cookiejar.LWPCookieJar(filename='cookies.txt')
+    def pubkeyData(self):
+        '''
+        获取 pubkey 数据
+        :return: dict
+        '''
+        url = 'https://login.sina.com.cn/sso/prelogin.php?entry=account&callback=pluginSSOController.preloginCallBack&su=MTUxMDE1Mjg3Nzk%3D&rsakt=mod&checkpin=1&client=ssologin.js(v1.4.19)&_='+str(int(time.time()*1000))
+        req = self.session.get(url,headers=self.headers)
+        data = json.loads(re.findall('preloginCallBack\(({.+})',req.text)[0])
+        return data
 
-    def _get_signurate(self,timestamp):
-        #获取加密签名
-        hm = hmac.new(b'd1b964811afb40118a12068ff74a12f4', digestmod=hashlib.sha1)
-        grant_type = 'password'
-        client_id = 'c3cef7c66a1843f8b3a9e6a1e3160e20'
-        source = 'com.zhihu.web'
-        hm.update(bytes((grant_type + client_id + source + timestamp), 'utf-8'))
-        return hm.hexdigest()
-    def get_time(self):
-        #获取时间戳
-        return str(int(time.time() * 1000))
+    def load_cookies(self):
+        """
+        读取 Cookies 文件加载到 Session
+        :return: bool
+        """
+        try:
+            self.session.cookies.load(ignore_discard=True)
+            return True
+        except FileNotFoundError:
+            print('Cookies.txt 未找到，读取失败')
+            return False
+    def check_login(self):
+        '''
+        检查登陆状态
+        :return: bool
+        '''
+        res = self.session.get('http://my.sina.com.cn/',headers=self.headers,allow_redirects=False)
+        if res.status_code == 200:
+            self.session.cookies.save()
+            return True
+        return False
+    def get_pwd(self, data):
+        '''
+        rsa加密密码
+        :param data: pubkey等数据
+        :return: str
+        '''
+        rsa_e = int('10001',16)
+        pw_string = str(data['servertime']) + '\t' + str(data['nonce']) + '\n' + str(self.password)
+        key = rsa.PublicKey(int(data['pubkey'], 16), rsa_e)
+        pw_encypted = rsa.encrypt(pw_string.encode('utf-8'), key)
+        self.password = ''  # 安全起见清空明文密码
+        passwd = binascii.b2a_hex(pw_encypted)
+        return passwd
 
-
-    def get_captcha(self):
-        self.headers.update({
-            # 更新headers
-            'authorization': 'oauth c3cef7c66a1843f8b3a9e6a1e3160e20',
-            # 身份认证信息
-            'X-Xsrftoken': self.session.cookies.get('_xsrf'),
-        })
-        captchaurl = 'https://www.zhihu.com/api/v3/oauth/captcha?lang=cn'
-        res = self.session.get(captchaurl, headers=self.headers)
-        if 'True' in res.text:
-            print('请输入验证码')
-            pass
-        else:
-            print('')
-    def login(self):
-        self.get_captcha()
-        #构造postdata
+    def get_su(self):
+        '''
+        用户名编码
+        :return: str
+        '''
+        username_urllike = urllib.request.quote(self.username)
+        username_encrypted = base64.b64encode(bytes(username_urllike, encoding='utf-8'))
+        return username_encrypted.decode('utf-8')
+    def login(self,load_cookies=True):
+        '''
+        登陆请求
+        :param load_cookies:是否上次保存的加载了cookies
+        :return: bool
+        '''
+        if load_cookies and self.load_cookies():
+            if self.check_login():
+                print('已读取 cookies 登录成功')
+                return True
+            else:
+                print('保存的cookies 已失效，请重新登陆')
+                print('Cookies.txt 未找到，读取失败')
+                user = input('请输入账号:')
+                password = input('请输入密码:')
+                self.username = user
+                self.password = password
+        url = 'https://login.sina.com.cn/sso/login.php?client=ssologin.js(v1.4.19)'
+        data = self.pubkeyData()
+        #构造 post数据
         post_data = {
-            'client_id': 'c3cef7c66a1843f8b3a9e6a1e3160e20',
-            'grant_type': 'password',
-            'timestamp': self.get_time(),
-            'source': 'com.zhihu.web',
-            'signature': self._get_signurate(self.get_time()),
-            'username': '+8615101528779',
-            'password': 'aq918927',
-            'captcha': '',
-            'lang': 'cn',
-            'ref_source': 'homepage',
-            'utm_source': '',
+            "entry": "weibo",
+            "gateway": "1",
+            "from": "",
+            "savestate": "7",
+            "qrcode_flag":'false',
+            "useticket": "1",
+            "pagerefer": "https://login.sina.com.cn/crossdomain2.php?action=logout&r=https%3A%2F%2Fweibo.com%2Flogout.php%3Fbackurl%3D%252F",
+            "vsnf": "1",
+            "su": self.get_su(),
+            "service": "miniblog",
+            "servertime": data['servertime'],
+            "nonce": data['nonce'],
+            "pwencode": "rsa2",
+            "rsakv": data['rsakv'],
+            "sp": self.get_pwd(data),
+            "sr": "1920*1080",
+            "encoding": "UTF-8",
+            "prelt": "194",
+            "url": "https://weibo.com/ajaxlogin.php?framelogin=1&callback=parent.sinaSSOController.feedBackUrlCallBack",
+            "returntype": "META"
         }
-        loginUrl = 'https://www.zhihu.com/api/v3/oauth/sign_in'
-        res = self.session.post(loginUrl, data=post_data, headers=self.headers)
-        auth = re.findall('"z_c0":"(.+)"},"refresh_token"',res.text)[0]
-        self.headers.update({'authorization':auth})
-        ifLogin = self.session.get('https://www.zhihu.com/api/v4/me?include=visits_count',headers=self.headers).json()
-        if ifLogin.get('name'):
-            print('登录成功 用户名为：%s' % ifLogin.get('name'))
-    def send(self,message):
-        post_data = {
-            "type": "common",
-            "content": message,
-            "receiver_hash": "c1bec6c58a14d9e4265f2dddcf59308d"
-        }
-        sendUrl = 'https://www.zhihu.com/api/v4/messages'
-        res = self.session.post(sendUrl,data=post_data,headers=self.headers)
-        print(res.text)
 
-
-
+        res = self.session.post(url,data=post_data,headers=self.headers)
+        # print(res.text)
+        #post 后会返回 重定向页面的网址
+        url2 = re.findall('location\.replace\("(https://.+)"\);',res.content.decode('gbk'))[0]
+        res2 = self.session.get(url2,headers=self.headers)
+        url3 = re.findall("location\.replace\('(https://.+)'\);",res2.content.decode('gbk'))[0]
+        res3 = self.session.get(url3,headers=self.headers)
+        #重定向结束后 登录成功 访问你的首页 通过判断你的用户名是否存在来认定是否登录成功
+        loginurl = 'http://weibo.com' + re.findall('"userdomain":"(.+)}}', res3.text)[0]
+        loginres = self.session.get(loginurl, headers=self.headers).text
+        try:
+            username = re.findall(r"\$CONFIG\['nick'\]='(.+); ", loginres)[0]
+        except Exception as e:
+            print(e)
+        if username:
+            filename = 'cookies.txt'
+            self.session.cookies.save(ignore_discard=True, ignore_expires=True)
+            print('登录成功 当前用户为；%s' % username)
 if __name__ == '__main__':
-    username = input('输入用户名：')
-    password = input('输入密码：')
-    login = ZhihuLogin(username,password)
-    login.login()
 
-
+    s = Launcher()
+    s.login()
