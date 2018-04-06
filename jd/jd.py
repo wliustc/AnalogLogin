@@ -7,16 +7,28 @@ import base64
 from PIL import  Image
 from pyquery import PyQuery as pq
 import random
+import os
+from http import cookiejar
 class JdLogin():
-    def __init__(self,username,password):
-        self.username = username
-        self.password = password
+    def __init__(self):
         self.session = requests.session()
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36',
             'Referer':'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fwww.jd.com%2F'
         }
-
+        self.session.cookies = cookiejar.LWPCookieJar(filename='cookies.txt')
+    def load_cookies(self):
+        try:
+            self.session.cookies.load(ignore_discard=True)
+            home_page = 'https://home.jd.com/'
+            home_res = self.session.get(home_page, headers=self.headers)
+            user = re.findall('<a href="//me.jd.com" target="_blank">(.+)</a>', home_res.text)[0]
+            print('登录成功 用户名：%s' % user)
+            self.session.cookies.save()
+            return True
+        except Exception as e:
+            print('Cookies.txt 未找到，读取失败')
+            return False
     def get_captcha(self,uuid):
         '''
         先用username验证是否需要验证码
@@ -39,6 +51,8 @@ class JdLogin():
         im = Image.open('captcha.png')
         im.show()
         captchaCode = input('输入验证码')
+        os.remove('captcha.png')
+
         return captchaCode
     def get_pwd(self):
         '''
@@ -71,6 +85,12 @@ class JdLogin():
         利用验证码, pubkey, token伪造post请求获取登录结果
         :return: 是否登录成功
         '''
+        if self.load_cookies():
+            return True
+        username = input('输入用户名：')
+        password = input('输入密码：')
+        self.username=username
+        self.password=password
         login_url = 'https://passport.jd.com/new/login.aspx'
         login_res = self.session.get(login_url,headers=self.headers)
         uuid = re.findall(' name="uuid" value="(.+)"/>',login_res.text)[0]
@@ -105,26 +125,65 @@ class JdLogin():
             home_res = self.session.get(home_page,headers=self.headers)
             user= re.findall('<a href="//me.jd.com" target="_blank">(.+)</a>',home_res.text)[0]
             print('登录成功 用户名：%s' % user)
+            self.session.cookies.save(ignore_discard=True, ignore_expires=True)
+            s = input('是否购买,购买输入1,否则随意键退出')
+            if s == '1':
+                id = input('输入商品链接')
+                pid = re.findall('\d+', id)[0]
+                self.login.add_to_cart(pid)
+                self.login.buy_id(pid)
             #输出用户名即为成功
-    def buy_id(self,pid):
+    def get_time(self):
+        return str(int(time.time()*1000))
+    def  add_to_cart(self,id):
+        '''
+        根据商品id 讲商品加入购物车
+        :param id: 商品识别码
+        :return:
+        '''
+        url4 = 'https://cart.jd.com/gate.action?rd=0.39726436210775695&f=3&pid={}&ptype=1&pcount=1&callback=jQuery8061798&_={}'.format(id,self.get_time())
+        res4 = self.session.get(url4,headers=self.headers)
+        print(res4.text)
+
+
+    def get_cart(self):
+        '''
+        获取购物车内商品
+        :return:
+        '''
+        url = 'https://cart.jd.com/cart?rd%s' % time.time()
+        res = self.session.get(url,headers= self.headers)
+        html = pq(res.text)
+        name = html('div.p-name').text()
+        print('name %s' % name)
+    def buy_id(self):
         '''
         通过商品的id伪造提交购买订单
         :param pid:
         :return:
         '''
-        post_url = 'https://cart.jd.com/tproduct?pid={}&rid={}'.format(pid,str(random.random()))
-        post_res = self.session.post(post_url,data={},headers=self.headers)
-        print(post_res.text)
-        get_url = 'https://cart.jd.com/addToCart.html?rcd=1&pid={}&pc=1&eb=1&rid={}&em='.format(pid,str(int(time.time()*1000)))
-        get_res = self.session.get(get_url,headers=self.headers)
-        print(get_res.text)
-        url = 'https://skunotify.jd.com/breakice/query.action?callback=jQuery1346080&skuId={}&touchChannel=11&totalNum=4&exclusiveMaxNum=3&from=1&appName=cart&_='.format(pid,str(int(time.time()*1000)))
+        # 'https://gia.jd.com/y.html?v=0.9520271196999908&o=trade.jd.com/shopping/order/getOrderInfo.action'
+        # var jd_risk_token_id='EFNCB57W4CDXKH43EAZEIIQNG7LQY72TWNVNQIC7IIOQFCIHDXJ2FBP32S5GS47LRJIGORFWMF5NW';var pin='FIACATPODPVANT2JNZEK6AC63Y';'
+        url = 'https://trade.jd.com/shopping/order/getOrderInfo.action?rid={}'.format(self.get_time())
         res = self.session.get(url,headers=self.headers)
-        print(res.text)
-        print(self.session.get('https://trade.jd.com/shopping/order/getOrderInfo.action?rid='.format(str(int(time.time()*1000))),headers=self.headers).text)
+        riskControl  = re.findall('id="riskControl" value="(.+)"/>',res.text)[0]
+        post = 'https://trade.jd.com/shopping/order/submitOrder.action'
+        cookies = requests.utils.dict_from_cookiejar(self.session.cookies)
+        riskControl = 'D0E404CB705B97325B3FD5B6613C678F93893C507A9457906A0F57D52B4C67F5'
+        post_data = {
+            'overseaPurchaseCookies':'',
+            'submitOrderParam.sopNotPutInvoice':'false',
+            'submitOrderParam.trackID': cookies.get('TrackId'),
+            'submitOrderParam.ignorePriceChange':0,
+            'submitOrderParam.btSupport':0,
+            'submitOrderParam.eid':'NV4NBKH5AQIV532ZMF7FAQCDYXEC3ZCPXSA5LNXXDUFWMW5DY67MWH4NZPHEE3EKTGI7DU4K47GMPZGZHY354765UE',
+            'submitOrderParam.fp':'29ad958ce85dc0137cb1fdabe2522d78',
+            'riskControl':riskControl
+        }
+        post_res  = self.session.post(post,data=post_data,headers=self.headers)
+        if ',"resultCode":0,' in post_res.text:
+            print('提交购买成功 请登录账号付款')
 if __name__ == '__main__':
-    username = input('输入用户名：')
-    password = input('输入密码：')
-    login = JdLogin(username,password)
+
+    login = JdLogin()
     login.login()
-    # login.buy_id('6558982')
