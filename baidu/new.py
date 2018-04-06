@@ -136,12 +136,7 @@ class baiduLogin():
 		vcodetypeUrl = vcodetypeUrl.format(self.token,str(int(time.time())),self.username,dv, self.callback)
 		vcodetypeRes = self.session.get(vcodetypeUrl).text
 		vcodetype  = re.findall('"vcodetype" : "(.+)",        "userid"',vcodetypeRes)[0]
-		code_string  = re.findall('"codeString" : "(.+)",\s+"vco',vcodetypeRes)[0]
-		# url = 'https://passport.baidu.com/v2/?reggetcodestr&token={}&tpl=mn&apiver=v3&tt={}&fr=login&loginversion=v4&vcodetype={}&traceid=&callback={}'.format(
-		# 	token, str(int(time.time() * 1000)), vcodetype, callback)
-		# res = session.get(url)
-		# verifyStr = re.findall(' "verifyStr" : "(.+)",\s+"verifySign"', res.text)[0]
-		# code_string = self.get_captcha_str()
+		code_string  = re.findall('"codeString" : "(.+)",\s+"vco',vcodetypeRes)[0] #获取验证码字符串
 		url = 'https://passport.baidu.com/cgi-bin/genimage?'+code_string
 		with open('capthca.png','wb') as f:
 			f.write(self.session.get(url).content)
