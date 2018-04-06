@@ -17,12 +17,16 @@ from http import cookiejar
 import base64
 import random
 class baiduLogin():
-	def __init__(self):
+	def __init__(self, username, password):
 		'''
-		初始化 session headers
+		初始化 用户名 密码 session headers
 		构造 gid callback参数
 		通过gid callback 获取token
+		:param username: 用户名
+		:param password: 密码
 		'''
+		self.username = username
+		self.password = password
 		self.headers = headers = {
     		'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36'
 		}
@@ -30,19 +34,6 @@ class baiduLogin():
 		self.gid = self.get_gid()
 		self.callback = self.get_callback()
 		self.token = self.get_token()
-		self.session.cookies = cookiejar.LWPCookieJar(filename='cookies.txt')
-	def load_cookies(self):
-		try:
-			self.session.cookies.load(ignore_discard=True)
-			home_page = self.session.get('http://i.baidu.com/', headers=self.headers).text
-			user = re.findall('class="ibx-uc-nick">(.+)</a>', home_page)[0]
-			print(user)
-			return True
-		except FileNotFoundError:
-			print('Cookies.txt 未找到，读取失败')
-			self.username = input('输入用户名：')
-			self.password = input('输入密码：')
-			return False
 	def get_gid(self,):
 		'''
 		阅读js文件
@@ -143,7 +134,6 @@ class baiduLogin():
 		dv = 'tk0.40904722587657581522648037169@ppo0k-9DpYrm~nCnj5n32uMeUCnehOrDhOM-Iz8Mt9FBeXAkpjuDpYrR6~Ok0yrGyyA2EhD3HGCneOMehDn2V~r2UOHMuXp3jP7BnY9kqxrGyf9k2V9D6Yrm~nCnj5n32uMeUCnehOrDhOM-Iz8Mt9FBeXAk6zrDnYrR6~Ok3xAkqYI029EethDIUOn2uCMz0yMeUepdIfDZ2L8GyxuDFjAk4xrMyxAkqYI029EethDIUOn2uCMz0yMeUepdIfDZ2L8GyjrDpzAk4xrMy_nofuD4eAkpxufydrD4yA5hPp-rLpvPg8BjbKmeY7dHb71yf9k2V-ss8CsuXspyJhuohrGyfAkFeForHvYyARCy9Dqwuz4fuD6-uRn-uD6~uD4fuRCxrkr-rDFjhorJ5Ewp5raAfU-H-pQFZ2b85nQFdULAf~e7ZEX8ZXQ8BC_~o0psuRnYrz6YrD4yrmy~rD3-Ak4euRqYrDCwrmyfuDFyAk0frDFYrDr~uC__yo0dsrmy~ufyfu1yfufywrGyeu1ye9GyduGy-9myxufyjrmyjuGy~rkCYrDqeAk0fumy~rRnYrD4dAk0-ufyfrDrYrRreAk4xrC__'
 		vcodetypeUrl = 'https://passport.baidu.com/v2/api/?logincheck&token={}&tpl=mn&apiver=v3&tt={}&sub_source=leadsetpwd&username={}&loginversion=v4&dv={}+&callback={}'
 		vcodetypeUrl = vcodetypeUrl.format(self.token,str(int(time.time())),self.username,dv, self.callback)
-		print(vcodetypeUrl)
 		vcodetypeRes = self.session.get(vcodetypeUrl).text
 		vcodetype  = re.findall('"vcodetype" : "(.+)",        "userid"',vcodetypeRes)[0]
 		code_string  = re.findall('"codeString" : "(.+)",\s+"vco',vcodetypeRes)[0]
@@ -157,7 +147,7 @@ class baiduLogin():
 			f.write(self.session.get(url).content)
 		im  = Image.open('capthca.png')
 		im.show()
-		captchCode = input('输入验证马:')
+		captchCode = input('输入验证码：')
 		im.close()
 		return captchCode,code_string
 
@@ -170,9 +160,6 @@ class baiduLogin():
 		成功后访问个人中心获取用户名打印出来
 		:return:
 		'''
-		if self.load_cookies():
-			return True
-
 		captchaCode, code_string =self.get_captchaCode()
 		rsakey = self.get_rsakey()
 		post_data = {
@@ -214,13 +201,9 @@ class baiduLogin():
 		post_res = self.session.post(post_url, data=post_data, headers=self.headers)
 		#当返回值有err_no=0时登录成功
 		result= re.findall('err_no=(\d+)',post_res.text)[0]
-		print(result)
 		if result == '0':
-			filepath = 'cookie.txt'
 			home_page = self.session.get('http://i.baidu.com/', headers=self.headers).text
 			user = re.findall('class="ibx-uc-nick">(.+)</a>',home_page)[0]
-			filepath = 'cookie.txt'
-			self.session.cookies.save(ignore_discard=True, ignore_expires=True)
 			print('登录成功 %s ' % user)
 		elif result == '6':
 			print('验证码错误')
@@ -229,6 +212,7 @@ class baiduLogin():
 			print('密码错误')
 			self.get_login_info()
 if __name__ == '__main__':
-
-    logind = baiduLogin()
+    username = input('输入用户名：')
+    password = input('输入密码：')
+    logind = baiduLogin(username,password)
     logind.get_login_info()
