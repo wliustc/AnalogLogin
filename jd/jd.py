@@ -12,6 +12,7 @@ from http import cookiejar
 class JdLogin():
     def __init__(self):
         self.session = requests.session()
+        self.username = ''
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36',
             'Referer':'https://passport.jd.com/new/login.aspx?ReturnUrl=https%3A%2F%2Fwww.jd.com%2F'
@@ -20,15 +21,22 @@ class JdLogin():
     def load_cookies(self):
         try:
             self.session.cookies.load(ignore_discard=True)
-            home_page = 'https://home.jd.com/'
-            home_res = self.session.get(home_page, headers=self.headers)
+
+            return True
+        except Exception as e:
+            print('Cookies.txt 未找到，读取失败')
+            return False
+    def check_login(self):
+        home_page = 'https://home.jd.com/'
+        home_res = self.session.get(home_page, headers=self.headers)
+        try:
             user = re.findall('<a href="//me.jd.com" target="_blank">(.+)</a>', home_res.text)[0]
             print('登录成功 用户名：%s' % user)
             self.session.cookies.save()
             return True
         except Exception as e:
-            print('Cookies.txt 未找到，读取失败')
-            return False
+            return  False
+
     def get_captcha(self,uuid):
         '''
         先用username验证是否需要验证码
@@ -85,15 +93,24 @@ class JdLogin():
         利用验证码, pubkey, token伪造post请求获取登录结果
         :return: 是否登录成功
         '''
-        if self.load_cookies():
+        if self.load_cookies() and self.check_login():
+            self.add_to_cart()
             return True
-        username = input('输入用户名：')
-        password = input('输入密码：')
-        self.username=username
-        self.password=password
+        if self.username == '':
+            username = input('输入用户名：')
+            password = input('输入密码：')
+            self.username = username
+            self.password = password
         login_url = 'https://passport.jd.com/new/login.aspx'
         login_res = self.session.get(login_url,headers=self.headers)
-        uuid = re.findall(' name="uuid" value="(.+)"/>',login_res.text)[0]
+        while True:
+            try:
+                login_res = self.session.get(login_url, headers=self.headers)
+                uuid = re.findall(' name="uuid" value="(.+)"/>', login_res.text)[0]
+                break
+            except IndexError as e:
+                pass
+
         sa_token = re.findall('name="sa_token" value="(.+)"/>',login_res.text)[0]
         pubkey = re.findall('id="pubKey" value="(.+)" class="hide"/',login_res.text)[0]
         captcha_code = self.get_captcha(uuid)
@@ -115,36 +132,36 @@ class JdLogin():
         post_res = self.session.post(post_url,data=post_data,headers=self.headers)
         s =  eval("u"+"\'"+post_res.text+"\'")
         if '验证码不正确' in s:
-            print('验证码错误')
+            print('验证码错误, 请重新输入')
             self.login()
         elif '账户名与密码不匹配' in s:
             print('账户名与密码不匹配，请重新输入')
-
+            self.password = input('输入密码：')
+            self.login()
         elif 'success' in s:
             home_page = 'https://home.jd.com/'
             home_res = self.session.get(home_page,headers=self.headers)
             user= re.findall('<a href="//me.jd.com" target="_blank">(.+)</a>',home_res.text)[0]
             print('登录成功 用户名：%s' % user)
             self.session.cookies.save(ignore_discard=True, ignore_expires=True)
-            s = input('是否购买,购买输入1,否则随意键退出')
-            if s == '1':
-                id = input('输入商品链接')
-                pid = re.findall('\d+', id)[0]
-                self.login.add_to_cart(pid)
-                self.login.buy_id(pid)
-            #输出用户名即为成功
+            self.add_to_cart()
     def get_time(self):
         return str(int(time.time()*1000))
-    def  add_to_cart(self,id):
+    def  add_to_cart(self):
         '''
         根据商品id 讲商品加入购物车
         :param id: 商品识别码
         :return:
         '''
-        url4 = 'https://cart.jd.com/gate.action?rd=0.39726436210775695&f=3&pid={}&ptype=1&pcount=1&callback=jQuery8061798&_={}'.format(id,self.get_time())
-        res4 = self.session.get(url4,headers=self.headers)
-        print(res4.text)
+        s = input('是否购买,购买输入1,否则随意键退出')
+        if s == '1':
+            id = input('输入商品链接')
+            pid = re.findall('\d+', id)[0]
 
+            url4 = 'https://cart.jd.com/gate.action?rd=0.39726436210775695&f=3&pid={}&ptype=1&pcount=1&callback=jQuery8061798&_={}'.format(pid,self.get_time())
+            res4 = self.session.get(url4,headers=self.headers)
+            print(res4.text)
+            self.buy_id()
 
     def get_cart(self):
         '''
@@ -181,8 +198,11 @@ class JdLogin():
             'riskControl':riskControl
         }
         post_res  = self.session.post(post,data=post_data,headers=self.headers)
+        print(post_res.text)
         if ',"resultCode":0,' in post_res.text:
             print('提交购买成功 请登录账号付款')
+        elif '您本次购买件数超过了限购件数，请回到购物车修改商品数量后再重新下单' in post_res.text:
+            print('您本次购买件数超过了限购件数，请回到购物车修改商品数量后再重新下单')
 if __name__ == '__main__':
 
     login = JdLogin()
