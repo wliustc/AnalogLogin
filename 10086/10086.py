@@ -53,7 +53,7 @@ class yidongLogin():
 		return text.decode()
 
 	def get_login_info(self):
-		self.get_login_captcha()
+		self.get_login_captcha() #获取并显示验证码
 		smsPwd = input('请输入验证码:')
 
 		loginUrl = 'https://login.10086.cn/login.htm'
