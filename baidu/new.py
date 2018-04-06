@@ -13,19 +13,16 @@ import rsa
 from Crypto.PublicKey import RSA
 from Crypto.Util import asn1
 from Crypto.Cipher import PKCS1_v1_5
+from http import cookiejar
 import base64
 import random
 class baiduLogin():
-	def __init__(self, username, password):
+	def __init__(self):
 		'''
-		初始化 用户名 密码 session headers
+		初始化 session headers
 		构造 gid callback参数
 		通过gid callback 获取token
-		:param username: 用户名
-		:param password: 密码
 		'''
-		self.username = username
-		self.password = password
 		self.headers = headers = {
     		'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36'
 		}
@@ -33,8 +30,19 @@ class baiduLogin():
 		self.gid = self.get_gid()
 		self.callback = self.get_callback()
 		self.token = self.get_token()
-
-
+		self.session.cookies = cookiejar.LWPCookieJar(filename='cookies.txt')
+	def load_cookies(self):
+		try:
+			self.session.cookies.load(ignore_discard=True)
+			home_page = self.session.get('http://i.baidu.com/', headers=self.headers).text
+			user = re.findall('class="ibx-uc-nick">(.+)</a>', home_page)[0]
+			print(user)
+			return True
+		except FileNotFoundError:
+			print('Cookies.txt 未找到，读取失败')
+			self.username = input('输入用户名：')
+			self.password = input('输入密码：')
+			return False
 	def get_gid(self,):
 		'''
 		阅读js文件
@@ -162,6 +170,9 @@ class baiduLogin():
 		成功后访问个人中心获取用户名打印出来
 		:return:
 		'''
+		if self.load_cookies():
+			return True
+
 		captchaCode, code_string =self.get_captchaCode()
 		rsakey = self.get_rsakey()
 		post_data = {
@@ -205,9 +216,11 @@ class baiduLogin():
 		result= re.findall('err_no=(\d+)',post_res.text)[0]
 		print(result)
 		if result == '0':
-
+			filepath = 'cookie.txt'
 			home_page = self.session.get('http://i.baidu.com/', headers=self.headers).text
 			user = re.findall('class="ibx-uc-nick">(.+)</a>',home_page)[0]
+			filepath = 'cookie.txt'
+			self.session.cookies.save(ignore_discard=True, ignore_expires=True)
 			print('登录成功 %s ' % user)
 		elif result == '6':
 			print('验证码错误')
@@ -216,7 +229,6 @@ class baiduLogin():
 			print('密码错误')
 			self.get_login_info()
 if __name__ == '__main__':
-    username = input('输入用户名：')
-    password = input('输入密码：')
-    logind = baiduLogin(username,password)
+
+    logind = baiduLogin()
     logind.get_login_info()
