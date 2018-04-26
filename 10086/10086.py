@@ -4,15 +4,16 @@ import random
 import urllib.parse
 import base64
 import rsa
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_v1_5
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Cipher import PKCS1_v1_5
 from PIL import Image
 from http import cookiejar
 
 
 class yidongLogin():
-	def __init__(self,username):
+	def __init__(self,username, password):
 		self.username = username
+		self.password = password
 		self.headers= headers = {
 				'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36',
 				'Host':'login.10086.cn',
@@ -82,16 +83,7 @@ class yidongLogin():
 			print('Cookies.txt 未找到，读取失败')
 			return False
 	def get_login_info(self):
-		'''
-		在上一次cookie不存在或失效的情况下重新登陆
-		可用直接判断是否登录成功
-		:return:
-		'''
-		if self.load_cookies() and self.check_login():
-			return True
-		else:
-			print('cookie 过期 重新登陆')
-			self.password = input('输入密码：')
+
 		self.get_login_captcha() #获取并显示验证码
 		smsPwd = input('请输入验证码:')
 
@@ -112,15 +104,50 @@ class yidongLogin():
 		loginRes = self.session.get(loginUrl, params=loginData, headers=self.headers)
 		try:
 			artifact = loginRes.json()['artifact']
+			artifactUrl = 'http://shop.10086.cn/i/v1/auth/getArtifact?backUrl=http://shop.10086.cn/i/sso.html&artifact={}'.format(
+				artifact)
+			self.session.get(artifactUrl, headers=self.headers)
+
+			self.check_login()
 		except Exception as e:
 			print(e)
-		artifactUrl = 'http://shop.10086.cn/i/v1/auth/getArtifact?backUrl=http://shop.10086.cn/i/sso.html&artifact={}'.format(
-			artifact)
-		self.session.get(artifactUrl, headers=self.headers)
+	def get_randCode(self,code):
+		text = base64.b64encode(code.encode())
+		return text.decode()
+	def get_records(self):
+		#发送验证码
+		html_url = 'https://shop.10086.cn/i/v1/fee/detbillrandomcodejsonp/{}?callback=jQuery183015845424583577938_1524716409747&_={}'
+		html_url = html_url.format(self.username, str(int(time.time()*1000)))
+		res = self.session.get(html_url, headers=self.headers )
+		print(res.text)
+		pwdTempSerCode = input('输入短信随机码：')
+		#获取验证码
+		capthca_url ='http://shop.10086.cn/i/authImg?t='+str(time.time())
+		with open('records.png','wb') as f:
+			f.write(self.session.get(capthca_url,headers=self.headers).content)
+		im = Image.open('records.png')
+		im.show()
+		captchaVal = input('输入验证码：')
 
-		self.check_login()
+		#身份认证
+		get_url = 'https://shop.10086.cn/i/v1/fee/detailbilltempidentjsonp/{}?callback=jQuery183015845424583577938_1524716409747&pwdTempSerCode={}&pwdTempRandCode={}&captchaVal={}&_={}'
+		get_url = get_url.format(self.username, self.get_randCode(self.password), self.get_randCode(pwdTempSerCode), captchaVal, str(int(time.time()*1000)))
+		print(get_url)
+		res = self.session.get(get_url,headers=self.headers)
+		print(res.text)
+		#验证 验证码正确
+		current_url ='http://shop.10086.cn/i/v1/res/precheck/{}}?captchaVal={}&_=1524716651808'
+		#获取通话详单
+		records_url ='https://shop.10086.cn/i/v1/fee/detailbillinfojsonp/{}}?callback=jQuery183015845424583577938_1524716409747&curCuror=1&step=100&qryMonth=201802&billType=04&_={}'
+		records_url = records_url.format(self.username, str(int(time.time()*1000)))
+		res = self.session.get(records_url, headers=self.headers)
+		print(res.text)
+
+
 
 if __name__ == '__main__':
     username= input('输入账号：')
-    login = yidongLogin(username)
+    password= input('输入服务密码：')
+    login = yidongLogin(username, password)
     login.get_login_info()
+    login.get_records()
